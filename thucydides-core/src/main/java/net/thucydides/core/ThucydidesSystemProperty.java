@@ -353,7 +353,10 @@ public enum ThucydidesSystemProperty {
      *  is different from the requirements base dir (for example when building a multi-module project from parent pom with
      *  requirements stored inside a sub-module : See Jira #Thucydides-100)
      */
-    TEST_REQUIREMENTS_ROOT("thucydides.test.requirements.basedir") ;
+    TEST_REQUIREMENTS_ROOT("thucydides.test.requirements.basedir"),
+
+    
+    TEST_REPORT_LANGUAGE("thucydides.test.report.language");
 
 
     private String propertyName;
