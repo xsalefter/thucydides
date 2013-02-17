@@ -29,25 +29,16 @@ public abstract class HtmlReporter {
     private final TemplateManager templateManager;
     private final EnvironmentVariables environmentVariables;
 
-    private Internationalization internationalization;
-
     private static final Logger LOGGER = LoggerFactory.getLogger(HtmlReporter.class);
 
     public HtmlReporter() {
         this(Injectors.getInjector().getInstance(EnvironmentVariables.class));
-        this.internationalization = new Internationalization();
     }
 
     public HtmlReporter(final EnvironmentVariables environmentVariables) {
         super();
         this.templateManager = Injectors.getInjector().getInstance(TemplateManager.class);
         this.environmentVariables = environmentVariables;
-        String language = environmentVariables.getProperty(ThucydidesSystemProperty.TEST_REPORT_LANGUAGE);
-        if (language.isEmpty()) {
-        	this.internationalization = new Internationalization();
-        } else {
-        	this.internationalization = new Internationalization(new Locale(language));
-        }
     }
 
     private TemplateManager getTemplateManager() {
@@ -113,14 +104,21 @@ public abstract class HtmlReporter {
     }
 
     protected Merger mergeTemplate(final String templateFile) {
-        return new Merger(templateFile);
+    	final String lang = this.environmentVariables.getProperty(ThucydidesSystemProperty.TEST_REPORT_LANGUAGE);
+    	if (lang == null) {
+    		return new Merger(templateFile, Locale.getDefault());
+    	} else {
+    		return new Merger(templateFile, new Locale(lang));
+    	}
     }
 
     protected class Merger {
         final String templateFile;
+        final Internationalization internationalization;
 
-        public Merger(final String templateFile) {
+        public Merger(final String templateFile, Locale locale) {
             this.templateFile = templateFile;
+            this.internationalization = new Internationalization(locale);
         }
 
         public String usingContext(final Map<String, Object> context) {
