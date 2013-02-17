@@ -66,9 +66,9 @@
                 marginTop:'15px'
             },
             series:[
-                {label:'${testOutcomes.successCount} / ${testOutcomes.total} tests passed' },
-                {label:'${testOutcomes.pendingCount} / ${testOutcomes.total} tests pending'},
-                {label:'${testOutcomes.failureCount} / ${testOutcomes.total} tests failed'}
+                {label:'${testOutcomes.successCount} / ${testOutcomes.total} ${home_test_passed}' },
+                {label:'${testOutcomes.pendingCount} / ${testOutcomes.total} ${home_test_pending}'},
+                {label:'${testOutcomes.failureCount} / ${testOutcomes.total} ${home_test_failed}'}
             ]
         });
 
