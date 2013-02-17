@@ -9,21 +9,10 @@ import net.thucydides.core.PendingStepException;
 import net.thucydides.core.Thucydides;
 import net.thucydides.core.annotations.TestAnnotations;
 import net.thucydides.core.guice.Injectors;
-import net.thucydides.core.model.DataTable;
-import net.thucydides.core.model.Screenshot;
-import net.thucydides.core.model.ScreenshotPermission;
-import net.thucydides.core.model.Story;
-import net.thucydides.core.model.TakeScreenshots;
-import net.thucydides.core.model.TestOutcome;
-import net.thucydides.core.model.TestResult;
-import net.thucydides.core.model.TestStep;
-import net.thucydides.core.model.TestTag;
+import net.thucydides.core.model.*;
 import net.thucydides.core.pages.Pages;
 import net.thucydides.core.pages.SystemClock;
-import net.thucydides.core.screenshots.Photographer;
-import net.thucydides.core.screenshots.ScreenshotAndHtmlSource;
-import net.thucydides.core.screenshots.ScreenshotException;
-import net.thucydides.core.screenshots.ScreenshotProcessor;
+import net.thucydides.core.screenshots.*;
 import net.thucydides.core.webdriver.Configuration;
 import net.thucydides.core.webdriver.WebDriverFacade;
 import net.thucydides.core.webdriver.WebdriverProxyFactory;
@@ -34,19 +23,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 
 import static net.thucydides.core.model.Stories.findStoryFrom;
-import static net.thucydides.core.model.TestResult.FAILURE;
-import static net.thucydides.core.model.TestResult.IGNORED;
-import static net.thucydides.core.model.TestResult.PENDING;
-import static net.thucydides.core.model.TestResult.SKIPPED;
-import static net.thucydides.core.model.TestResult.SUCCESS;
+import static net.thucydides.core.model.TestResult.*;
 import static net.thucydides.core.steps.BaseStepListener.ScreenshotType.MANDATORY_SCREENSHOT;
 import static net.thucydides.core.steps.BaseStepListener.ScreenshotType.OPTIONAL_SCREENSHOT;
 import static net.thucydides.core.util.NameConverter.underscore;
@@ -75,6 +55,7 @@ public class BaseStepListener implements StepListener, StepPublisher {
      */
     private final Stack<TestStep> currentGroupStack;
 
+    private StepEventBus eventBus;
     /**
      * Clock used to pause test execution.
      */
@@ -105,6 +86,17 @@ public class BaseStepListener implements StepListener, StepPublisher {
     private List<String> storywideIssues;
 
     private List<TestTag> storywideTags;
+
+    public void setEventBus(StepEventBus eventBus) {
+        this.eventBus = eventBus;
+    }
+
+    public StepEventBus getEventBus() {
+        if (eventBus == null) {
+            eventBus = StepEventBus.getEventBus();
+        }
+        return eventBus;
+    }
 
     protected enum ScreenshotType {
         OPTIONAL_SCREENSHOT,
@@ -406,7 +398,7 @@ public class BaseStepListener implements StepListener, StepPublisher {
 
     private void updateExampleTableIfNecessary(TestResult result) {
         if (getCurrentTestOutcome().isDataDriven()) {
-            getCurrentTestOutcome().getDataTable().currentRow().hasResult(result);
+            getCurrentTestOutcome().updateCurrentRowResult(result);
         }
     }
 
@@ -621,18 +613,30 @@ public class BaseStepListener implements StepListener, StepPublisher {
 
     private Optional<ScreenshotAndHtmlSource> grabScreenshotFor(final String testName) {
         String snapshotName = underscore(testName);
-        // TODO: Use unique identifier instead of test name
+
         Optional<File> screenshot = getPhotographer().takeScreenshot(snapshotName);
         if (screenshot.isPresent()) {
-            File sourcecode = getPhotographer().getMatchingSourceCodeFor(screenshot.get());
-            return Optional.of(new ScreenshotAndHtmlSource(screenshot.get(), sourcecode));
+            if (shouldStoreSourcecode()) {
+                File sourcecode = getPhotographer().getMatchingSourceCodeFor(screenshot.get());
+                return Optional.of(new ScreenshotAndHtmlSource(screenshot.get(), sourcecode));
+            } else {
+                return Optional.of(new ScreenshotAndHtmlSource(screenshot.get()));
+            }
         }
         return Optional.absent();
     }
 
-    public Photographer getPhotographer() {
-        return new Photographer(driver, outputDirectory);
+    private boolean shouldStoreSourcecode() {
+        return configuration.storeHtmlSourceCode();
+    }
 
+    public Photographer getPhotographer() {
+        ScreenshotBlurCheck blurCheck = new ScreenshotBlurCheck();
+        if (blurCheck.blurLevel().isPresent()) {
+           return new Photographer(driver, outputDirectory, blurCheck.blurLevel().get());
+        } else {
+            return new Photographer(driver, outputDirectory);
+        }
     }
 
     private boolean shouldTakeEndOfStepScreenshotFor(final TestResult result) {
@@ -703,18 +707,19 @@ public class BaseStepListener implements StepListener, StepPublisher {
     }
 
     public void exampleStarted(Map<String,String> data) {
+        if (getCurrentTestOutcome().isDataDriven() && !getCurrentTestOutcome().dataIsPredefined()) {
+            getCurrentTestOutcome().addRow(data);
+        }
         currentExample++;
-        StepEventBus.getEventBus().stepStarted(ExecutedStepDescription.withTitle(exampleIntro(currentExample) + data));
+        getEventBus().stepStarted(ExecutedStepDescription.withTitle(exampleTitle(currentExample, data)));
     }
 
-    private String exampleIntro(int exampleNumber) {
-        return String.format("Example %s) ", exampleNumber);
+    private String exampleTitle(int exampleNumber, Map<String, String> data) {
+        return String.format("[%s] %s", exampleNumber, data);
     }
 
     public void exampleFinished() {
-        if (!getCurrentTestOutcome().getDataTable().atLastRow()) {
-            getCurrentTestOutcome().getDataTable().nextRow();
-        }
-        stepFinished();
+        getCurrentTestOutcome().moveToNextRow();
+        getEventBus().stepFinished();
     }
 }

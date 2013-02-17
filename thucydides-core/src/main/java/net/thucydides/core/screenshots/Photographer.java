@@ -2,8 +2,11 @@ package net.thucydides.core.screenshots;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.jhlabs.image.BoxBlurFilter;
+import net.thucydides.core.ThucydidesSystemProperty;
 import net.thucydides.core.digest.Digest;
 import net.thucydides.core.guice.Injectors;
+import net.thucydides.core.util.EnvironmentVariables;
 import net.thucydides.core.webdriver.WebDriverFacade;
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.OutputType;
@@ -13,10 +16,13 @@ import org.openqa.selenium.WebDriverException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorModel;
+import java.awt.image.WritableRaster;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.UUID;
 
 /**
@@ -34,9 +40,11 @@ public class Photographer {
     private final WebDriver driver;
     private final File targetDirectory;
     private final ScreenshotSequence screenshotSequence;
+    private Optional<BlurLevel> blurLevel;
 
     private final Logger logger = LoggerFactory.getLogger(Photographer.class);
     private ScreenshotProcessor screenshotProcessor;
+    private EnvironmentVariables environmentVariables;
 
     protected Logger getLogger() {
         return logger;
@@ -45,10 +53,31 @@ public class Photographer {
     private static final ScreenshotSequence DEFAULT_SCREENSHOT_SEQUENCE = new ScreenshotSequence();
 
     public Photographer(final WebDriver driver, final File targetDirectory) {
-        this(driver, targetDirectory, Injectors.getInjector().getInstance(ScreenshotProcessor.class));
+        this(driver, targetDirectory, Injectors.getInjector().getInstance(ScreenshotProcessor.class), null);
+    }
+
+    public Photographer(final WebDriver driver, final File targetDirectory, final BlurLevel blurLevel) {
+        this(driver, targetDirectory, Injectors.getInjector().getInstance(ScreenshotProcessor.class), blurLevel);
     }
 
     public Photographer(final WebDriver driver, final File targetDirectory, final ScreenshotProcessor screenshotProcessor) {
+        this(driver, targetDirectory, screenshotProcessor, null);
+    }
+
+
+    public Photographer(final WebDriver driver,
+                        final File targetDirectory,
+                        final ScreenshotProcessor screenshotProcessor,
+                        BlurLevel blurLevel) {
+        this(driver, targetDirectory, screenshotProcessor, blurLevel,
+             Injectors.getInjector().getInstance(EnvironmentVariables.class));
+    }
+
+    public Photographer(final WebDriver driver,
+                            final File targetDirectory,
+                            final ScreenshotProcessor screenshotProcessor,
+                            BlurLevel blurLevel,
+                            EnvironmentVariables environmentVariables) {
         Preconditions.checkNotNull(targetDirectory);
         Preconditions.checkNotNull(screenshotProcessor);
 
@@ -56,6 +85,8 @@ public class Photographer {
         this.targetDirectory = targetDirectory;
         this.screenshotProcessor = screenshotProcessor;
         this.screenshotSequence = DEFAULT_SCREENSHOT_SEQUENCE;
+        this.blurLevel = Optional.fromNullable(blurLevel);
+        this.environmentVariables = environmentVariables;
     }
 
     protected long nextScreenshotNumber() {
@@ -80,10 +111,17 @@ public class Photographer {
                 } else if (isByteArray(capturedScreenshot)) {
                     screenshotFile = saveScreenshotData((byte[]) capturedScreenshot);
                 }
+                if (screenshotFile != null && blurLevel.isPresent()) {
+                    screenshotFile = blur(screenshotFile);
+                }
                 if (screenshotFile != null) {
                     File savedScreenshot = targetScreenshot(prefix);
                     screenshotProcessor.queueScreenshot(new QueuedScreenshot(screenshotFile, savedScreenshot));
-                    savePageSourceFor(savedScreenshot.getAbsolutePath());
+
+                    if (!blurLevel.isPresent() && shouldSavePageSource()) {
+                        savePageSourceFor(savedScreenshot.getAbsolutePath());
+                    }
+
                     return Optional.of(savedScreenshot);
                 }
             } catch (Throwable e) {
@@ -91,6 +129,31 @@ public class Photographer {
             }
         }
         return Optional.absent();
+    }
+
+    private boolean shouldSavePageSource() {
+        return environmentVariables.getPropertyAsBoolean(ThucydidesSystemProperty.THUCYDIDES_STORE_HTML_SOURCE, false);
+    }
+
+    protected File blur(File srcFile) throws Exception {
+        BufferedImage srcImage = ImageIO.read(srcFile);
+        BufferedImage destImage = deepCopy(srcImage);
+        BoxBlurFilter boxBlurFilter = new BoxBlurFilter();
+        boxBlurFilter.setRadius(blurLevel.get().getRadius());
+        boxBlurFilter.setIterations(3);
+        destImage = boxBlurFilter.filter(srcImage, destImage);
+
+        ByteArrayOutputStream outStream = new ByteArrayOutputStream();
+        ImageIO.write(destImage, "png", outStream);
+
+        return  saveScreenshotData(outStream.toByteArray());
+    }
+
+    private BufferedImage deepCopy(BufferedImage srcImage) {
+        ColorModel cm = srcImage.getColorModel();
+        boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
+        WritableRaster raster = srcImage.copyData(null);
+        return new BufferedImage(cm, raster, isAlphaPremultiplied, null);
     }
 
     private File saveScreenshotData(byte[] capturedScreenshot) throws IOException {

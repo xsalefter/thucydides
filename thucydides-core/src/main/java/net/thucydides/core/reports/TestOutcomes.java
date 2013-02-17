@@ -43,6 +43,7 @@ import static ch.lambdaj.Lambda.on;
 import static ch.lambdaj.Lambda.select;
 import static ch.lambdaj.Lambda.sort;
 import static ch.lambdaj.Lambda.sum;
+import static net.thucydides.core.reports.matchers.TestOutcomeMatchers.havingTag;
 import static net.thucydides.core.reports.matchers.TestOutcomeMatchers.havingTagName;
 import static net.thucydides.core.reports.matchers.TestOutcomeMatchers.havingTagType;
 import static net.thucydides.core.reports.matchers.TestOutcomeMatchers.withResult;
@@ -213,6 +214,10 @@ public class TestOutcomes {
         return withTag(requirement.getName());
     }
 
+    public boolean containsTag(TestTag testTag) {
+        return getTags().contains(testTag);
+    }
+
     private class TagFinder {
         private final String tagType;
 
@@ -253,6 +258,10 @@ public class TestOutcomes {
      */
     public TestOutcomes withTag(String tagName) {
         return TestOutcomes.of(filter(havingTagName(tagName), outcomes)).withLabel(tagName).withRootOutcomes(getRootOutcomes());
+    }
+
+    public TestOutcomes withTag(TestTag tag) {
+        return TestOutcomes.of(filter(havingTag(tag), outcomes)).withLabel(tag.getName()).withRootOutcomes(getRootOutcomes());
     }
 
     /**
@@ -428,6 +437,19 @@ public class TestOutcomes {
         return (passingStepCount / (double) getEstimatedTotalStepCount());
     }
 
+    public Double getPercentagePassingTestCount() {
+        return (getPassingTests().getTotal() / (double) getTotal());
+    }
+
+    public Double getPercentageFailingTestCount() {
+        return (getFailingTests().getTotal() / (double) getTotal());
+    }
+
+    public Double getPercentagePendingTestCount() {
+        int notPassingOrFailing = getTotal() - getPassingTests().getTotal() - getFailingTests().getTotal();
+        return (notPassingOrFailing / (double) getTotal());
+    }
+
     public String getDecimalPercentagePassingStepCount() {
         return formatAsDecimal(getPercentagePassingStepCount());
     }
@@ -438,6 +460,18 @@ public class TestOutcomes {
 
     public String getDecimalPercentageFailingStepCount() {
         return formatAsDecimal(getPercentageFailingStepCount());
+    }
+
+    public String getDecimalPercentagePassingTestCount() {
+        return formatAsDecimal(getPercentagePassingTestCount());
+    }
+
+    public String getDecimalPercentagePendingTestCount() {
+        return formatAsDecimal(getPercentagePendingTestCount());
+    }
+
+    public String getDecimalPercentageFailingTestCount() {
+        return formatAsDecimal(getPercentageFailingTestCount());
     }
 
     DecimalFormat decimalFormat = new DecimalFormat("#.##", DecimalFormatSymbols.getInstance(Locale.US));

@@ -90,6 +90,11 @@ public enum ThucydidesSystemProperty {
     VERBOSE_SCREENSHOTS("thucydides.verbose.screenshots"),
 
     /**
+     * If set to true, WebElementFacade events and other step actions will be logged to the console.
+     */
+    VERBOSE_STEPS("thucydides.verbose.steps"),
+
+    /**
      *  Fine-grained control over when screenshots are to be taken.
      *  This property accepts the following values:
      *  <ul>
@@ -136,10 +141,15 @@ public enum ThucydidesSystemProperty {
 
     /**
      * The estimated number of steps in a pending scenario.
-     * The estimated number of steps in a pending sceario.
      * This is used for stories where no scenarios have been defined.
      */
     ESTIMATED_AVERAGE_STEP_COUNT("thucydides.estimated.average.step.count"),
+
+    /**
+     * The estimated number of tests in a typical story.
+     * Used to estimate functional coverage in the requirements reports.
+     */
+    ESTIMATED_TESTS_PER_REQUIREMENT("thucydides.estimated.tests.per.requirement"),
 
     /**
      *  Base URL for the issue tracking system to be referred to in the reports.
@@ -215,6 +225,12 @@ public enum ThucydidesSystemProperty {
     ACTIVTE_HIGHLIGHTING("thucydides.activate.highlighting"),
 
     /**
+     * Batch strategy to use for parallel batches.
+     * Allowed values - DIVIDE_EQUALLY (default) and DIVIDE_BY_TEST_COUNT
+     */
+    BATCH_STRATEGY("thucydides.batch.strategy"),
+
+    /**
      *  A deprecated property that is synonymous with thucydides.batch.size
      */
     BATCH_COUNT("thucydides.batch.count"),
@@ -256,6 +272,14 @@ public enum ThucydidesSystemProperty {
      * Arguments to be passed to the Chrome driver, separated by commas.
      */
     CHROME_SWITCHES("chrome.switches"),
+
+
+    /**
+     * Preferences to be passed to the Firefox driver, separated by semi-colons (commas often appear in the preference
+     * values.
+     */
+    FIREFOX_PREFERENCES("firefox.preferences"),
+
     /**
      * Enable JQuery integration.
      * If set to true (the default), JQuery will be injected into any page that does not already have it.
@@ -354,6 +378,18 @@ public enum ThucydidesSystemProperty {
      *  requirements stored inside a sub-module : See Jira #Thucydides-100)
      */
     TEST_REQUIREMENTS_ROOT("thucydides.test.requirements.basedir"),
+
+    /**
+     * Set to true if you want the HTML source code to be recorded as well as the screenshots.
+     * This is not currently used in the reports.
+     */
+    THUCYDIDES_STORE_HTML_SOURCE("thucydides.store.html.source"),
+
+    /**
+     * If set to true, a copy of the original screenshot will be kept when screenshots are scaled for the reports.
+     * False by default to conserve disk space.
+     */
+    THUCYDIDES_KEEP_UNSCALED_SCREENSHOTS("thucydides.keep.unscaled.screenshots");
 
     
     TEST_REPORT_LANGUAGE("thucydides.test.report.language");

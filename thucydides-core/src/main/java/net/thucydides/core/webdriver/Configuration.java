@@ -9,8 +9,6 @@ import java.io.File;
 public interface Configuration {
     SupportedWebDriver getDriverType();
 
-    File loadOutputDirectoryFromSystemProperties();
-
     int getStepDelay();
 
     int getElementTimeout();
@@ -44,6 +42,8 @@ public interface Configuration {
      * How often should screenshots be taken.
      */
     Optional<TakeScreenshots> getScreenshotLevel();
+
+    boolean storeHtmlSourceCode();
 
     void setIfUndefined(String property, String value);
 

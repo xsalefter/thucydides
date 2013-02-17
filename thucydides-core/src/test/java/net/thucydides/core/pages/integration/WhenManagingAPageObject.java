@@ -1,5 +1,6 @@
-package net.thucydides.core.pages;
+package net.thucydides.core.pages.integration;
 
+import net.thucydides.core.pages.PageObject;
 import net.thucydides.core.util.MockEnvironmentVariables;
 import net.thucydides.core.webdriver.Configuration;
 import net.thucydides.core.webdriver.SystemPropertiesConfiguration;
@@ -58,6 +59,11 @@ public class WhenManagingAPageObject {
         protected WebElement getButton() {
             return mockButton;
         }
+
+        public void invokeWaitABit(long time) {
+            waitABit(500);
+        }
+
 
     }
 
@@ -130,7 +136,7 @@ public class WhenManagingAPageObject {
     public void page_can_delay_requests_for_a_short_period() {
         long start = System.currentTimeMillis();
         BasicPageObject page = new BasicPageObject(driver);
-        page.waitABit(500);
+        page.invokeWaitABit(500);
 
         assertThat((int) (System.currentTimeMillis() - start), greaterThanOrEqualTo(500));
     }

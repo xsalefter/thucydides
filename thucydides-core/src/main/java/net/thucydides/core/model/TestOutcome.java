@@ -1,6 +1,5 @@
 package net.thucydides.core.model;
 
-import ch.lambdaj.Lambda;
 import ch.lambdaj.function.convert.Converter;
 import com.google.common.base.Joiner;
 import com.google.common.base.Optional;
@@ -32,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
@@ -216,6 +216,7 @@ public class TestOutcome {
                           final Story userStory,
                           final Throwable testFailureCause,
                           final TestResult annotatedResult,
+                          final DataTable dataTable,
                           final Optional<String> qualifier) {
         this.startTime = startTime;
         this.duration = duration;
@@ -230,6 +231,7 @@ public class TestOutcome {
         this.testFailureCause = testFailureCause;
         this.qualifier = qualifier;
         this.annotatedResult = annotatedResult;
+        this.dataTable = dataTable;
         this.issueTracking = Injectors.getInjector().getInstance(IssueTracking.class);
         this.linkGenerator = Injectors.getInjector().getInstance(LinkGenerator.class);
     }
@@ -258,7 +260,30 @@ public class TestOutcome {
                                    this.userStory,
                                    this.testFailureCause,
                                    this.annotatedResult,
+                                   this.dataTable,
                                    Optional.fromNullable(qualifier));
+        } else {
+            return this;
+        }
+    }
+
+
+    public TestOutcome withMethodName(String methodName) {
+        if (methodName != null) {
+            return new TestOutcome(this.startTime,
+                    this.duration,
+                    this.storedTitle,
+                    methodName,
+                    this.testCase,
+                    this.getTestSteps(),
+                    this.issues,
+                    this.additionalIssues,
+                    this.tags,
+                    this.userStory,
+                    this.testFailureCause,
+                    this.annotatedResult,
+                    this.dataTable,
+                    this.qualifier);
         } else {
             return this;
         }
@@ -434,7 +459,6 @@ public class TestOutcome {
             } else {
                 leafTestSteps.add(step);
             }
-
         }
         return ImmutableList.copyOf(leafTestSteps);
     }
@@ -467,8 +491,7 @@ public class TestOutcome {
      * @return this TestOucome insstance - this is a convenience to allow method chaining.
      */
     public TestOutcome recordStep(final TestStep step) {
-        checkNotNull(step.getDescription(),
-                "The test step description was not defined.");
+        checkNotNull(step.getDescription(), "The test step description was not defined.");
         if (inGroup()) {
             getCurrentStepGroup().addChildStep(step);
         } else {
@@ -728,7 +751,7 @@ public class TestOutcome {
                     Joiner joiner = Joiner.on("-");
                     issueKey = joiner.join(getProjectPrefix(), issueKey);
                 }
-                return issueKey;  //To change body of implemented methods use File | Settings | File Templates.
+                return issueKey;
             }
 
 
@@ -784,6 +807,24 @@ public class TestOutcome {
 
     public void useExamplesFrom(DataTable table) {
         this.dataTable = table;
+    }
+
+    public void moveToNextRow() {
+        if (dataTable != null && !dataTable.atLastRow()) {
+            dataTable.nextRow();
+        }
+    }
+
+    public void updateCurrentRowResult(TestResult result) {
+        dataTable.currentRow().hasResult(result);
+    }
+
+    public boolean dataIsPredefined() {
+        return dataTable.hasPredefinedRows();
+    }
+
+    public void addRow(Map<String, ? extends Object> data) {
+        dataTable.addRow(data);
     }
 
     private static class ExtractTestResultsConverter implements Converter<TestStep, TestResult> {
@@ -1009,6 +1050,25 @@ public class TestOutcome {
 
     public boolean isDataDriven() {
         return dataTable != null;
+    }
+
+    public String getDataDrivenSampleScenario() {
+        if (!isDataDriven() || getTestSteps().isEmpty() || !getTestSteps().get(0).hasChildren()) {
+            return "";
+        }
+        TestStep firstExample = getTestSteps().get(0);
+        StringBuilder sampleScenario = new StringBuilder();
+        for(TestStep topLevelChildStep : firstExample.getChildren()) {
+            sampleScenario.append(topLevelChildStep.getDescription());
+            if (topLevelChildStep != lastOf(firstExample.getChildren())) {
+                sampleScenario.append("\n");
+            }
+        }
+        return sampleScenario.toString();
+    }
+
+    private TestStep lastOf(List<TestStep> children) {
+        return children.get(children.size() - 1);
     }
 
     public DataTable getDataTable() {

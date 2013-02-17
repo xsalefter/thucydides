@@ -1,7 +1,10 @@
 package net.thucydides.core.screenshots;
 
+import com.google.common.base.Optional;
+import net.thucydides.core.guice.Injectors;
+import net.thucydides.core.util.EnvironmentVariables;
 import net.thucydides.core.util.ExtendedTemporaryFolder;
-
+import net.thucydides.core.util.MockEnvironmentVariables;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -16,15 +19,11 @@ import java.io.File;
 import java.io.IOException;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.*;
 import static org.hamcrest.Matchers.startsWith;
+import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyObject;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 public class WhenScreenshotsAreTaken {
 
@@ -49,17 +48,29 @@ public class WhenScreenshotsAreTaken {
             super(driver, targetDirectory);
         }
 
+        public MockPhotographer(final WebDriver driver, final File targetDirectory, final BlurLevel blurLevel) {
+            super(driver, targetDirectory, blurLevel);
+        }
+
         @Override
         protected boolean driverCanTakeSnapshots() {
             return (driver != null);
         }
+
+        @Override
+        protected File blur(File srcFile) throws Exception {
+            return srcFile;
+        }
     }
+
+    EnvironmentVariables environmentVariables = new MockEnvironmentVariables();
 
     @Before
     public void initMocks() throws IOException {
         MockitoAnnotations.initMocks(this);
         prepareTemporaryFilesAndDirectories();
-        photographer = new Photographer(driver, screenshotDirectory);        
+        photographer = new Photographer(driver,
+                                        screenshotDirectory);
     }
 
     public void prepareTemporaryFilesAndDirectories() throws IOException {
@@ -102,21 +113,10 @@ public class WhenScreenshotsAreTaken {
     }
 
     @Test
-    public void the_driver_should_save_the_corresponding_source_code() throws Exception {
-
-        when(driver.getScreenshotAs(OutputType.FILE)).thenReturn(screenshotTaken);
-        when(driver.getPageSource()).thenReturn("<html/>");
-        photographer.takeScreenshot("screenshot");
-        waitUntilScreenshotsProcessed();
-
-        verify(driver,times(1)).getPageSource();
-    }
-
-    @Test
     public void the_screenshot_should_be_stored_in_the_target_directory() throws IOException, InterruptedException{
 
         when(driver.getScreenshotAs(OutputType.FILE)).thenReturn(screenshotTaken);
-        
+
         String screenshotFile = photographer.takeScreenshot("screenshot").get().getName();
         waitUntilScreenshotsProcessed();
         File savedScreenshot = new File(screenshotDirectory, screenshotFile);
@@ -144,7 +144,13 @@ public class WhenScreenshotsAreTaken {
 
 
     @Test
-    public void the_photographer_should_provide_the_HTML_source_code_for_a_given_screenshot() throws Exception {
+    public void the_photographer_should_provide_the_HTML_source_code_for_a_given_screenshot_if_configured() throws Exception {
+
+        environmentVariables.setProperty("thucydides.store.html.source","true");
+        Photographer photographer = new Photographer(driver, screenshotDirectory,
+                                                     Injectors.getInjector().getInstance(ScreenshotProcessor.class),
+                                                     null,
+                                                     environmentVariables);
 
         when(driver.getScreenshotAs(OutputType.FILE)).thenReturn(screenshotTaken);
         when(driver.getPageSource()).thenReturn("<html/>");
@@ -155,6 +161,25 @@ public class WhenScreenshotsAreTaken {
         File htmlSource = photographer.getMatchingSourceCodeFor(screenshotFile);
 
         assertThat(htmlSource.isFile(), is(true));
+    }
+
+    @Test
+    public void the_photographer_should_not_provide_the_HTML_source_code_for_a_given_screenshot_by_default() throws Exception {
+
+        Photographer photographer = new Photographer(driver, screenshotDirectory,
+                Injectors.getInjector().getInstance(ScreenshotProcessor.class),
+                null,
+                environmentVariables);
+
+        when(driver.getScreenshotAs(OutputType.FILE)).thenReturn(screenshotTaken);
+        when(driver.getPageSource()).thenReturn("<html/>");
+
+        File screenshotFile = photographer.takeScreenshot("screenshot").get();
+        waitUntilScreenshotsProcessed();
+
+        File htmlSource = photographer.getMatchingSourceCodeFor(screenshotFile);
+
+        assertThat(htmlSource.isFile(), is(false));
     }
 
     @Test
@@ -207,5 +232,30 @@ public class WhenScreenshotsAreTaken {
 
         verify(screenshotProcessor).queueScreenshot((QueuedScreenshot) anyObject());
     }
+
+    @Test
+    public void should_blur_screenshots_if_blurScreenshots_option_is_present() throws Exception {
+        Photographer photographer = new MockPhotographer(driver, screenshotDirectory, BlurLevel.HEAVY);
+        photographer = spy(photographer);
+        when(driver.getScreenshotAs(OutputType.FILE)).thenReturn(screenshotTaken);
+        photographer.takeScreenshot("screenshot");
+        waitUntilScreenshotsProcessed();
+
+        verify(photographer, times(1)).blur(any(File.class));
+        verify(driver,times(1)).getScreenshotAs((OutputType<?>) anyObject());
+    }
+
+    @Test
+    public void should_not_blur_screenshots_if_blurScreenshots_option_is_absent() throws Exception {
+        Photographer photographer = new MockPhotographer(driver, screenshotDirectory, null);
+        photographer = spy(photographer);
+        when(driver.getScreenshotAs(OutputType.FILE)).thenReturn(screenshotTaken);
+        photographer.takeScreenshot("screenshot");
+        waitUntilScreenshotsProcessed();
+
+        verify(photographer, times(0)).blur(any(File.class));
+        verify(driver,times(1)).getScreenshotAs((OutputType<?>) anyObject());
+    }
+
 
 }
