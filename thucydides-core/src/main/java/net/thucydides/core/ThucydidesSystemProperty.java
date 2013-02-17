@@ -389,7 +389,7 @@ public enum ThucydidesSystemProperty {
      * If set to true, a copy of the original screenshot will be kept when screenshots are scaled for the reports.
      * False by default to conserve disk space.
      */
-    THUCYDIDES_KEEP_UNSCALED_SCREENSHOTS("thucydides.keep.unscaled.screenshots");
+    THUCYDIDES_KEEP_UNSCALED_SCREENSHOTS("thucydides.keep.unscaled.screenshots"),
 
     
     TEST_REPORT_LANGUAGE("thucydides.test.report.language");
